@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nacc-progression"
 version = "0.1.0"
-description = "Longitudinal multimodal NACC progression modeling and evaluation."
+description = "Longitudinal multimodal NACC progression modeling, explainability, and platform UI."
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
@@ -19,11 +19,23 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "argon2-cffi>=23.1",
+    "bcrypt>=4.0",
+    "streamlit>=1.40",
+    "requests>=2.30",
+    "httpx>=0.27",
+]
 
 [project.scripts]
 nacc-cohort = "nacc_progression.workstream1.cli:main"
 nacc-final = "nacc_progression.run_final:main"
 nacc-compare = "nacc_progression.run_comparisons:main"
+nacc-api = "nacc_progression.platform.cli:run_api"
+nacc-ui = "nacc_progression.platform.cli:run_ui"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

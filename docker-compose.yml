@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nacc_progression_backend
+    command: ["python", "-m", "nacc_progression.platform.cli", "api", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PLATFORM_DB_PATH=/app/data/platform_data.db
+      - PLATFORM_ENV=${PLATFORM_ENV:-production}
+      - DEMO_MODE=${DEMO_MODE:-0}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    volumes:
+      - platform_storage:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nacc_progression_frontend
+    command: ["python", "-m", "nacc_progression.platform.cli", "ui", "--port", "8501", "--server-address", "0.0.0.0"]
+    ports:
+      - "8501:8501"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BACKEND_API_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  platform_storage:

@@ -1,0 +1,21 @@
+# Streamlit Community Cloud runtime dependencies
+# Lightweight CPU-only PyTorch index to prevent build timeouts & disk quota exhaustion
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2.0
+
+# Core Scientific & Data Processing
+numpy>=1.26.0
+pandas>=2.0.0
+pyarrow>=18.0.0
+scikit-learn>=1.5.0
+matplotlib>=3.8.0
+altair>=5.0.0
+
+# Frontend & Schema
+streamlit>=1.40.0
+pydantic>=2.9.0
+requests>=2.30.0
+
+# Authentication & Security
+argon2-cffi>=23.1.0
+bcrypt>=4.0.0

@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from nacc_progression.identity import subject_key
+import subprocess
+import sys
+from nacc_progression.identity import subject_key, validate_secret_file_security
 from nacc_progression.integration import prepare, read_table, DataBlocked, CLINICAL_ORDER
 from nacc_progression.run_final import execute
 
@@ -268,3 +270,124 @@ def test_raw_freeze74_sources_build_cohort_and_preflight(tmp_path):
         for partition in sequences.values()
         for history in partition
     )
+
+
+def test_validate_secret_path_rules(tmp_path):
+    repo = tmp_path / "fake_repo"
+    repo.mkdir()
+
+    # 1. Non-absolute path rejected
+    with pytest.raises(DataBlocked, match="absolute"):
+        validate_secret_file_security("secret.bin", repo)
+
+    # 2. Secret inside repo rejected
+    in_repo_secret = repo / "secret.bin"
+    in_repo_secret.write_bytes(b"x" * 32)
+    with pytest.raises(DataBlocked, match="outside the repository"):
+        validate_secret_file_security(in_repo_secret, repo)
+
+    # 3. Non-existent file rejected
+    missing_secret = tmp_path / "does_not_exist.bin"
+    with pytest.raises(DataBlocked, match="does not exist or is not a regular file"):
+        validate_secret_file_security(missing_secret, repo)
+
+
+def test_validate_secret_posix_rules(tmp_path, monkeypatch):
+    import nacc_progression.identity as id_mod
+
+    secret = tmp_path / "secret.bin"
+    secret.write_bytes(b"x" * 32)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    # Simulate POSIX platform
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    # Mode 0600 passes
+    monkeypatch.setattr(id_mod, "_get_posix_file_mode", lambda path: 0o100600)
+    validate_secret_file_security(secret, repo)
+
+    # Mode 0644 (world readable) fails
+    monkeypatch.setattr(id_mod, "_get_posix_file_mode", lambda path: 0o100644)
+    with pytest.raises(DataBlocked, match="mode 0600"):
+        validate_secret_file_security(secret, repo)
+
+    # Mode 0660 (group readable/writable) fails
+    monkeypatch.setattr(id_mod, "_get_posix_file_mode", lambda path: 0o100660)
+    with pytest.raises(DataBlocked, match="mode 0600"):
+        validate_secret_file_security(secret, repo)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows NTFS tests")
+def test_validate_secret_windows_ntfs_real(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    secret = tmp_path / "secret_real.bin"
+    secret.write_bytes(b"x" * 32)
+
+    # 1. Fresh secret file in user temp directory passes
+    validate_secret_file_security(secret, repo)
+
+    # 2. Granting access to Everyone is rejected
+    subprocess.check_call(["icacls", str(secret), "/grant", "Everyone:R"], stdout=subprocess.DEVNULL)
+    with pytest.raises(DataBlocked, match="unauthorized principal"):
+        validate_secret_file_security(secret, repo)
+
+    # Remove Everyone and verify it passes again
+    subprocess.check_call(["icacls", str(secret), "/remove", "Everyone"], stdout=subprocess.DEVNULL)
+    validate_secret_file_security(secret, repo)
+
+    # 3. Granting access to BUILTIN\Users is rejected
+    subprocess.check_call(["icacls", str(secret), "/grant", "Users:R"], stdout=subprocess.DEVNULL)
+    with pytest.raises(DataBlocked, match="unauthorized principal"):
+        validate_secret_file_security(secret, repo)
+
+    subprocess.check_call(["icacls", str(secret), "/remove", "Users"], stdout=subprocess.DEVNULL)
+    validate_secret_file_security(secret, repo)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows NTFS mocked tests")
+def test_validate_secret_windows_ntfs_edge_cases(tmp_path, monkeypatch):
+    import nacc_progression.identity as id_mod
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    secret = tmp_path / "secret_edge.bin"
+    secret.write_bytes(b"x" * 32)
+
+    # 1. Untrusted owner rejected
+    def fake_inspect_bad_owner(*args, **kwargs):
+        raise DataBlocked("File owner (S-1-5-21-bad-owner) is not permitted by trusted identity policy")
+
+    monkeypatch.setattr(id_mod, "_inspect_handle_security", fake_inspect_bad_owner)
+    with pytest.raises(DataBlocked, match="not permitted by trusted identity policy"):
+        validate_secret_file_security(secret, repo)
+
+    # 2. NULL DACL rejected
+    def fake_inspect_null_dacl(*args, **kwargs):
+        raise DataBlocked("Security descriptor has NULL or absent DACL")
+
+    monkeypatch.setattr(id_mod, "_inspect_handle_security", fake_inspect_null_dacl)
+    with pytest.raises(DataBlocked, match="NULL or absent DACL"):
+        validate_secret_file_security(secret, repo)
+
+    # 3. Unsupported ACE type rejected
+    def fake_inspect_unsupported_ace(*args, **kwargs):
+        raise DataBlocked("Unsupported ACE type (9) encountered")
+
+    monkeypatch.setattr(id_mod, "_inspect_handle_security", fake_inspect_unsupported_ace)
+    with pytest.raises(DataBlocked, match="Unsupported ACE type"):
+        validate_secret_file_security(secret, repo)
+
+
+def test_path_stat_remains_unmodified_by_secret_tests(tmp_path):
+    """Regression test: verify normal pathlib.Path.stat() is never corrupted or monkeypatched."""
+    test_file = tmp_path / "normal_file.txt"
+    test_file.write_text("regression_check", encoding="utf-8")
+
+    # Path.exists() internally invokes self.stat(follow_symlinks=follow_symlinks) in Python 3.13
+    assert test_file.exists()
+    st = test_file.stat(follow_symlinks=True)
+    assert hasattr(st, "st_mode")
+    assert hasattr(st, "st_size")
+    assert st.st_size == len("regression_check")

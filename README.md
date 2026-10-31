@@ -14,11 +14,13 @@ Research prototype for predicting Alzheimer dementia progression from longitudin
 ## Layout
 
 - `src/nacc_progression/`: contracts, model, training, evaluation, explainability, integration, and final runner.
+- `src/nacc_progression/platform/`: FastAPI backend, schemas, authentication, SQLite audit database, and demo engine.
+- `src/nacc_progression/frontend/`: Streamlit interactive 6-page clinical interface and charting components.
 - `src/nacc_progression/workstream1/`: clinical cohort and label pipeline.
 - `src/nacc_progression/workstream2/`: MRI validation and legacy audit utilities.
 - `configs/`: public schema and private-config template.
 - `docs/`: approved training instructions, privacy guidance, and MRI-workstream status.
-- `tests/`: synthetic unit and integration tests; no participant data.
+- `tests/`: synthetic unit, integration, and platform test suites; no participant data.
 - `NACC-DATA/`: local restricted source data. This directory is Git-ignored and must never be committed.
 
 ## Install and Test
@@ -26,9 +28,43 @@ Research prototype for predicting Alzheimer dementia progression from longitudin
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,web]"
 pytest
 ```
+
+## Platform, Backend & Frontend (Workstream 5)
+
+Workstream 5 provides the interactive research platform, REST API, authentication, and multi-page clinical interface.
+
+### Running the Services
+
+1. **Launch FastAPI Backend** (default: `http://localhost:8000`):
+   ```bash
+   nacc-api --host 0.0.0.0 --port 8000
+   ```
+   Interactive OpenAPI documentation is available at `http://localhost:8000/docs`.
+
+2. **Launch Streamlit Frontend** (default: `http://localhost:8501`):
+   ```bash
+   nacc-ui --port 8501
+   ```
+   Features six dedicated pages:
+   - **Login**: Role-based access with preset demo accounts (`researcher`, `clinician`, `admin`).
+   - **Patient Search**: Searchable longitudinal directory with trajectory filters.
+   - **Patient Overview**: Patient timeline, clinical variables, and anchor MRI status.
+   - **Prediction**: Multimodal progression risk inference and prefix trajectories.
+   - **Explainability**: Regional MRI attributions, clinical markers, and visit ablation sensitivity.
+   - **Dataset Audit**: NACC Freeze 74 benchmark metrics, split balance, and data protection policies.
+
+3. **Run Platform Test Suite**:
+   ```bash
+   python -m unittest tests.test_platform -v
+   ```
+
+4. **Docker Deployment**:
+   ```bash
+   docker-compose up --build
+   ```
 
 ## Private Data Workflow
 

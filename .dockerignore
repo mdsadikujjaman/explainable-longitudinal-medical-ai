@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+*.egg-info/
+.git/
+.gitignore
+.env
+*.db
+*.log
+
+# Data protection rules: never bundle restricted or private research assets
+NACC-DATA/
+data/restricted/
+data/processed/
+artifacts/
+restricted/
+*.parquet
+*.csv
+*.pt
+*.pth
+*.bin
+*private*

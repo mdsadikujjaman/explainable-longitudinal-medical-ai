@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from .integration import DataBlocked, prepare, read_table, CLINICAL_ORDER
+from .identity import validate_secret_file_security
 from .evaluation import (
     bootstrap_confidence_intervals,
     calculate_metrics,
@@ -111,8 +112,7 @@ def execute(config_path, output, train=False):
     if config.get('authorized_use_confirmed') is not True:
         raise DataBlocked('Authorized local NACC use must be confirmed in private configuration')
     secret_path = Path(config['secret_path'])
-    if not secret_path.is_absolute() or repo in secret_path.parents or secret_path.stat().st_mode & 0o077:
-        raise DataBlocked('Secret must be an absolute private path with mode 0600')
+    validate_secret_file_security(secret_path, repo)
 
     inputs = config['inputs']
     raw_source_keys = {'clinical_raw', 'mri_raw', 'cohort_config', 'mri_schema'}

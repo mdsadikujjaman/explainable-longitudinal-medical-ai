@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from nacc_progression.evaluation import ModelEvaluation, run_model_comparison
+from nacc_progression.identity import validate_secret_file_security
 from nacc_progression.integration import DataBlocked
 from nacc_progression.model import ModelConfig
 from nacc_progression.source_pipeline import prepare_from_raw_sources
@@ -79,12 +80,8 @@ def execute(config_path: str | Path, output_path: str | Path, bootstrap_repetiti
     if config.get("authorized_use_confirmed") is not True:
         raise DataBlocked("Authorized local NACC use must be confirmed in private configuration")
     secret_path = Path(config["secret_path"])
-    if (
-        not secret_path.is_absolute()
-        or project_root in secret_path.parents
-        or secret_path.stat().st_mode & 0o077
-    ):
-        raise DataBlocked("Secret must be outside the repository and have mode 0600")
+    validate_secret_file_security(secret_path, project_root)
+
 
     inputs = config["inputs"]
     required_inputs = {"clinical_raw", "mri_raw", "cohort_config", "mri_schema"}

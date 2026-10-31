@@ -22,5 +22,9 @@ restricted/
 /NACC-DATA/
 /configs/final.private.json
 /artifacts/private_runs/
-# End of ignore rules.
 
+# Streamlit secrets and local runtime configuration
+.streamlit/secrets.toml
+.streamlit/
+
+# End of ignore rules.
